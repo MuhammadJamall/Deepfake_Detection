@@ -1,17 +1,35 @@
+"""
+Dataset loading and preprocessing module
+"""
+
+import os
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
 from PIL import Image
-import platform
+import torch
+import numpy as np
+from collections import defaultdict
+
 
 class DeepfakeDataset(Dataset):
-    """Custom dataset for Deepfake detection"""
+    """
+    Custom PyTorch Dataset for Deepfake detection
+    
+    Loads images from organized class folders and provides labels.
+    """
     
     def __init__(self, root_dir, transform=None, class_to_idx=None):
+        """
+        Args:
+            root_dir (str): Directory containing class folders
+            transform (callable, optional): Transformations to apply
+            class_to_idx (dict, optional): Predefined class to index mapping
+        """
         self.root_dir = Path(root_dir)
         self.transform = transform
         
-        # Build class mapping
+        # Build class mapping if not provided
         if class_to_idx is None:
             classes = sorted([d.name for d in self.root_dir.iterdir() if d.is_dir()])
             self.class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
@@ -20,45 +38,85 @@ class DeepfakeDataset(Dataset):
         
         self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
         
-        # Collect all images
+        # Collect all images and their labels
         self.images = []
         self.labels = []
         
         for class_name, class_idx in self.class_to_idx.items():
             class_path = self.root_dir / class_name
             if class_path.exists():
-                for img_file in list(class_path.glob('*.png')) + list(class_path.glob('*.jpg')) + list(class_path.glob('*.jpeg')):
+                # Find all images (.png and .jpg)
+                image_files = list(class_path.glob('*.png')) + list(class_path.glob('*.jpg'))
+                for img_file in image_files:
                     self.images.append(img_file)
                     self.labels.append(class_idx)
     
     def __len__(self):
+        """Return total number of images"""
         return len(self.images)
     
     def __getitem__(self, idx):
+        """
+        Return image and label
+        
+        Args:
+            idx (int): Index of the item
+            
+        Returns:
+            tuple: (image tensor, label)
+        """
         img_path = self.images[idx]
         label = self.labels[idx]
         
-        # Load image
+        # Load and convert image to RGB
         image = Image.open(img_path).convert('RGB')
         
-        # Apply transforms
+        # Apply transformations if provided
         if self.transform:
             image = self.transform(image)
         
         return image, label
     
     def get_class_name(self, idx):
+        """Get class name from index"""
         return self.idx_to_class[idx]
+    
+    def get_stats(self):
+        """Print dataset statistics"""
+        class_counts = defaultdict(int)
+        for label in self.labels:
+            class_name = self.idx_to_class[label]
+            class_counts[class_name] += 1
+        
+        print("\n" + "="*50)
+        print("DATASET STATISTICS")
+        print("="*50)
+        print(f"Total images: {len(self)}")
+        print("\nClass distribution:")
+        for class_name in sorted(class_counts.keys()):
+            count = class_counts[class_name]
+            percentage = (count / len(self)) * 100
+            print(f"  {class_name}: {count} ({percentage:.1f}%)")
+        print("="*50 + "\n")
 
 
 def get_transforms(img_size=224):
-    """Return training and validation transforms"""
+    """
+    Create training and validation transforms
+    
+    Args:
+        img_size (int): Image size for resizing
+        
+    Returns:
+        tuple: (train_transform, val_transform)
+    """
     
     train_transform = transforms.Compose([
         transforms.Resize((img_size, img_size)),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomAffine(degrees=10, scale=(0.9, 1.1)),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.RandomRotation(15),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -78,67 +136,106 @@ def get_transforms(img_size=224):
     return train_transform, val_transform
 
 
-def get_dataloaders(dataset_dir, batch_size=32, train_split=0.8, val_split=0.1, num_workers=None):
-    """Create train, val, test dataloaders"""
+def get_dataloaders(dataset_dir, batch_size=32, train_split=0.8, val_split=0.1, num_workers=2):
+    """
+    Create train, validation, and test dataloaders
+    
+    Args:
+        dataset_dir (str): Path to dataset directory
+        batch_size (int): Batch size for dataloaders
+        train_split (float): Proportion for training (default: 0.8)
+        val_split (float): Proportion for validation (default: 0.1)
+        num_workers (int): Number of workers for data loading
+        
+    Returns:
+        tuple: (train_loader, val_loader, test_loader, class_to_idx)
+    """
     
     train_transform, val_transform = get_transforms()
-    if num_workers is None:
-        num_workers = 0 if platform.system() == "Windows" else 2
     
-    # Create full dataset
-    full_dataset = DeepfakeDataset(dataset_dir, transform=None)
-    class_to_idx = full_dataset.class_to_idx
+    # Create datasets with appropriate transforms
+    train_dataset = DeepfakeDataset(dataset_dir, transform=train_transform)
+    val_dataset = DeepfakeDataset(dataset_dir, transform=val_transform)
+    test_dataset = DeepfakeDataset(dataset_dir, transform=val_transform)
     
-    print(f"Total images: {len(full_dataset)}")
-    print(f"Classes: {list(class_to_idx.keys())}")
+    class_to_idx = train_dataset.class_to_idx
+    
+    print(f"\n✓ Dataset loaded from: {dataset_dir}")
+    print(f"✓ Total images: {len(train_dataset)}")
+    print(f"✓ Number of classes: {len(class_to_idx)}")
+    print(f"✓ Classes: {list(class_to_idx.keys())}")
     
     # Calculate split sizes
-    total_size = len(full_dataset)
+    total_size = len(train_dataset)
     train_size = int(total_size * train_split)
     val_size = int(total_size * val_split)
     test_size = total_size - train_size - val_size
     
-    # Split dataset
-    train_dataset, val_dataset, test_dataset = random_split(
-        full_dataset, 
-        [train_size, val_size, test_size]
+    # Split datasets
+    train_dataset, _ = random_split(
+        train_dataset, 
+        [train_size, total_size - train_size],
+        generator=torch.Generator().manual_seed(42)
+    )
+    val_dataset, _ = random_split(
+        val_dataset, 
+        [val_size, total_size - val_size],
+        generator=torch.Generator().manual_seed(42)
+    )
+    test_dataset, _ = random_split(
+        test_dataset, 
+        [test_size, total_size - test_size],
+        generator=torch.Generator().manual_seed(42)
     )
     
-    # Apply transforms per split without sharing state
-    train_images = [full_dataset.images[i] for i in train_dataset.indices]
-    train_labels = [full_dataset.labels[i] for i in train_dataset.indices]
-    val_images = [full_dataset.images[i] for i in val_dataset.indices]
-    val_labels = [full_dataset.labels[i] for i in val_dataset.indices]
-    test_images = [full_dataset.images[i] for i in test_dataset.indices]
-    test_labels = [full_dataset.labels[i] for i in test_dataset.indices]
-
-    train_dataset = DeepfakeDataset(dataset_dir, transform=train_transform, class_to_idx=class_to_idx)
-    val_dataset = DeepfakeDataset(dataset_dir, transform=val_transform, class_to_idx=class_to_idx)
-    test_dataset = DeepfakeDataset(dataset_dir, transform=val_transform, class_to_idx=class_to_idx)
-
-    train_dataset.images, train_dataset.labels = train_images, train_labels
-    val_dataset.images, val_dataset.labels = val_images, val_labels
-    test_dataset.images, test_dataset.labels = test_images, test_labels
-    
     # Create dataloaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=batch_size, 
+        shuffle=True, 
+        num_workers=num_workers,
+        pin_memory=True
+    )
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers=num_workers,
+        pin_memory=True
+    )
+    test_loader = DataLoader(
+        test_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers=num_workers,
+        pin_memory=True
+    )
     
-    print(f"\nDataset Split:")
-    print(f"  Train: {train_size} images")
-    print(f"  Val: {val_size} images")
-    print(f"  Test: {test_size} images")
+    print("\n" + "="*50)
+    print("DATALOADER SPLIT")
+    print("="*50)
+    print(f"Training set: {train_size} images ({train_split*100:.0f}%)")
+    print(f"Validation set: {val_size} images ({val_split*100:.0f}%)")
+    print(f"Test set: {test_size} images ({(1-train_split-val_split)*100:.0f}%)")
+    print(f"Batch size: {batch_size}")
+    print("="*50 + "\n")
     
     return train_loader, val_loader, test_loader, class_to_idx
 
 
 if __name__ == "__main__":
-    # Test the dataset
-    dataset = DeepfakeDataset("./data")
-    print(f"Dataset size: {len(dataset)}")
-    print(f"Classes: {dataset.class_to_idx}")
+    # Test code
+    dataset_path = "./data"
     
-    # Test dataloaders
-    train_loader, val_loader, test_loader, class_to_idx = get_dataloaders("./data")
-    print("Dataloaders created successfully!")
+    if os.path.exists(dataset_path):
+        train_loader, val_loader, test_loader, class_to_idx = get_dataloaders(
+            dataset_path,
+            batch_size=32
+        )
+        
+        # Verify a batch
+        images, labels = next(iter(train_loader))
+        print(f"✓ Batch shape: {images.shape}")
+        print(f"✓ Labels: {labels}")
+    else:
+        print(f"⚠ Dataset not found at {dataset_path}")
