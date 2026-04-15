@@ -2,11 +2,13 @@
 Model comparison and evaluation utilities
 """
 
-import torch
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+from matplotlib import cm
+from matplotlib.axes import Axes
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 )
@@ -19,7 +21,7 @@ class ModelComparator:
     Compare multiple trained models
     """
     
-    def __init__(self, results_dict):
+    def __init__(self, results_dict: dict[str, dict[str, Any]]):
         """
         Args:
             results_dict: Dictionary with model names as keys and results as values
@@ -30,7 +32,7 @@ class ModelComparator:
                          }
         """
         self.results_dict = results_dict
-        self.comparison_metrics = {}
+        self.comparison_metrics: dict[str, dict[str, float | None]] = {}
     
     def compute_metrics(self):
         """
@@ -42,14 +44,14 @@ class ModelComparator:
             probabilities = results['probabilities']
             
             # Calculate metrics
-            accuracy = accuracy_score(labels, predictions)
-            precision = precision_score(labels, predictions, average='weighted', zero_division=0)
-            recall = recall_score(labels, predictions, average='weighted', zero_division=0)
-            f1 = f1_score(labels, predictions, average='weighted', zero_division=0)
+            accuracy = float(accuracy_score(labels, predictions))
+            precision = float(precision_score(labels, predictions, average='weighted', zero_division=0))
+            recall = float(recall_score(labels, predictions, average='weighted', zero_division=0))
+            f1 = float(f1_score(labels, predictions, average='weighted', zero_division=0))
             
             # ROC-AUC for binary classification
             if len(np.unique(labels)) == 2:
-                roc_auc = roc_auc_score(labels, probabilities[:, 1])
+                roc_auc = float(roc_auc_score(labels, probabilities[:, 1]))
             else:
                 roc_auc = None
             
@@ -130,7 +132,7 @@ class ModelComparator:
         ax.set_xticks(x)
         ax.set_xticklabels(df.columns)
         ax.legend()
-        ax.set_ylim([0.7, 1.0])
+        ax.set_ylim(0.7, 1.0)
         ax.grid(axis='y', alpha=0.3)
         
         plt.tight_layout()
@@ -159,7 +161,7 @@ class ModelComparator:
         
         fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
         
-        colors = plt.cm.Set2(np.linspace(0, 1, len(df)))
+        colors = cm.get_cmap('Set2')(np.linspace(0, 1, len(df)))
         
         for idx, (model_name, color) in enumerate(zip(df.index, colors)):
             values = df.loc[model_name].tolist()
@@ -188,9 +190,8 @@ class ModelComparator:
             class_names = [f"Class {i}" for i in range(len(self.results_dict[list(self.results_dict.keys())[0]]['confusion_matrix']))]
         
         fig, axes = plt.subplots(1, len(class_names), figsize=(15, 4))
-        
-        if len(class_names) == 1:
-            axes = [axes]
+        axes_array = np.atleast_1d(axes).ravel()
+        axes_list = cast(list[Axes], axes_array.tolist())
         
         for class_idx, class_name in enumerate(class_names):
             metrics_per_model = {}
@@ -212,16 +213,16 @@ class ModelComparator:
             
             for i, model_name in enumerate(df_class.index):
                 offset = (i - len(df_class.index)/2 + 0.5) * width
-                axes[class_idx].bar(x + offset, df_class.loc[model_name], width, label=model_name, alpha=0.8)
+                axes_list[class_idx].bar(x + offset, df_class.loc[model_name], width, label=model_name, alpha=0.8)
             
-            axes[class_idx].set_title(f'{class_name}', fontweight='bold')
-            axes[class_idx].set_xticks(x)
-            axes[class_idx].set_xticklabels(df_class.columns, rotation=45)
-            axes[class_idx].set_ylim([0, 1.1])
-            axes[class_idx].grid(axis='y', alpha=0.3)
+            axes_list[class_idx].set_title(f'{class_name}', fontweight='bold')
+            axes_list[class_idx].set_xticks(x)
+            axes_list[class_idx].set_xticklabels(df_class.columns, rotation=45)
+            axes_list[class_idx].set_ylim(0.0, 1.1)
+            axes_list[class_idx].grid(axis='y', alpha=0.3)
             
             if class_idx == 0:
-                axes[class_idx].legend()
+                axes_list[class_idx].legend()
         
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -261,8 +262,12 @@ class ModelComparator:
             self.compute_metrics()
         
         scores = {name: metrics[metric] for name, metrics in self.comparison_metrics.items()}
-        best_model = max(scores, key=scores.get)
-        best_score = scores[best_model]
+        valid_scores = {name: score for name, score in scores.items() if score is not None}
+
+        if not valid_scores:
+            raise ValueError(f"No valid scores found for metric '{metric}'")
+
+        best_model, best_score = max(valid_scores.items(), key=lambda item: item[1])
         
         return best_model, best_score
 
