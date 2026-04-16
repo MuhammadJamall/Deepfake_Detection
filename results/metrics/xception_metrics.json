@@ -1,0 +1,109 @@
+{
+  "model": "Xception",
+  "architecture": "Depthwise Separable Convolutions",
+  "paper": "FaceForensics++ (Original Detection Model)",
+  "accuracy": 0.986644407345576,
+  "roc_auc": null,
+  "best_validation_accuracy": 0.9866399465597863,
+  "confusion_matrix": [
+    [
+      509,
+      1,
+      1,
+      4,
+      0,
+      4
+    ],
+    [
+      0,
+      471,
+      0,
+      0,
+      2,
+      2
+    ],
+    [
+      0,
+      0,
+      507,
+      0,
+      0,
+      3
+    ],
+    [
+      0,
+      0,
+      0,
+      503,
+      0,
+      1
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      496,
+      12
+    ],
+    [
+      1,
+      0,
+      0,
+      3,
+      5,
+      469
+    ]
+  ],
+  "classification_report": {
+    "Deepfakes": {
+      "precision": 0.9980392156862745,
+      "recall": 0.9807321772639692,
+      "f1-score": 0.989310009718173,
+      "support": 519.0
+    },
+    "Face2Face": {
+      "precision": 0.9978813559322034,
+      "recall": 0.991578947368421,
+      "f1-score": 0.9947201689545935,
+      "support": 475.0
+    },
+    "FaceShifter": {
+      "precision": 0.9980314960629921,
+      "recall": 0.9941176470588236,
+      "f1-score": 0.9960707269155207,
+      "support": 510.0
+    },
+    "FaceSwap": {
+      "precision": 0.9843444227005871,
+      "recall": 0.998015873015873,
+      "f1-score": 0.9911330049261083,
+      "support": 504.0
+    },
+    "NeuralTextures": {
+      "precision": 0.9860834990059643,
+      "recall": 0.9744597249508841,
+      "f1-score": 0.9802371541501976,
+      "support": 509.0
+    },
+    "Original": {
+      "precision": 0.955193482688391,
+      "recall": 0.9811715481171548,
+      "f1-score": 0.9680082559339526,
+      "support": 478.0
+    },
+    "accuracy": 0.986644407345576,
+    "macro avg": {
+      "precision": 0.9865955786794021,
+      "recall": 0.9866793196291876,
+      "f1-score": 0.9865798867664243,
+      "support": 2995.0
+    },
+    "weighted avg": {
+      "precision": 0.986838275379393,
+      "recall": 0.986644407345576,
+      "f1-score": 0.9866843867464834,
+      "support": 2995.0
+    }
+  }
+}
