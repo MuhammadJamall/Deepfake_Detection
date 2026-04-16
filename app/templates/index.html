@@ -1,82 +1,180 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Deepfake Detection</title>
-	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+	<title>DeepScan — AI Deepfake Detection</title>
+	<meta name="description" content="Upload an image and detect deepfakes using an ensemble of EfficientNet-B4 and Xception deep learning models.">
+
+	<!-- Google Fonts -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+	<!-- Bootstrap 5 -->
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+		  integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+	<!-- Bootstrap Icons -->
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+	<!-- Custom Stylesheet -->
 	<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+
+	<!-- Ambient background blobs -->
+	<div class="bg-blob bg-blob--1" aria-hidden="true"></div>
+	<div class="bg-blob bg-blob--2" aria-hidden="true"></div>
+	<div class="bg-blob bg-blob--3" aria-hidden="true"></div>
+
 	<main class="container py-5">
 		<div class="app-shell mx-auto">
-			<div class="text-center mb-4">
-				<h1 class="fw-bold mb-2">Deepfake Detection</h1>
-				<p class="text-secondary mb-0">Upload an image to analyze whether it is REAL or FAKE.</p>
-			</div>
 
-			<section class="card shadow-sm border-0 mb-4">
-				<div class="card-body p-4 p-md-5">
-					<div id="uploadZone" class="upload-zone mb-4" role="button" tabindex="0" aria-label="Upload image by drag and drop or file picker">
-						<h2 class="h5 mb-2">Drag and Drop Image Here</h2>
-						<p class="text-secondary mb-0">or use the file input button below</p>
+			<!-- ─── Header ─── -->
+			<header class="text-center mb-5 fade-in">
+				<div class="brand-icon mx-auto mb-3">
+					<i class="bi bi-shield-check"></i>
+				</div>
+				<h1 class="display-5 fw-900 mb-2 gradient-text">DeepScan</h1>
+				<p class="lead text-secondary mb-0">
+					AI-powered deepfake detection — powered by <strong>EfficientNet-B4</strong> &amp; <strong>Xception</strong>
+				</p>
+			</header>
+
+			<!-- ─── Upload Section ─── -->
+			<section class="glass-card mb-4 fade-in fade-in--delay-1" id="uploadSection">
+				<div class="card-inner">
+
+					<!-- Drop Zone -->
+					<div id="uploadZone" class="upload-zone" role="button" tabindex="0"
+						 aria-label="Upload image by drag and drop or click to browse">
+						<div class="upload-zone__content" id="uploadContent">
+							<div class="upload-icon-wrap">
+								<i class="bi bi-cloud-arrow-up"></i>
+							</div>
+							<h2 class="h5 fw-700 mb-1">Drop your image here</h2>
+							<p class="text-secondary small mb-0">or click anywhere to browse &middot; JPG, PNG, WEBP</p>
+						</div>
+						<!-- Image Preview (hidden until file selected) -->
+						<div id="previewWrap" class="preview-wrap d-none">
+							<img id="previewImage" class="preview-image" alt="Selected image preview" />
+						</div>
 					</div>
 
 					<input id="imageInput" type="file" accept="image/*" class="d-none" aria-hidden="true">
 
-					<div class="d-flex flex-wrap gap-2 justify-content-center mb-2">
-						<button id="chooseFileBtn" type="button" class="btn btn-outline-primary">Choose Image</button>
-						<button id="analyzeBtn" type="button" class="btn btn-primary" disabled>Run Detection</button>
+					<!-- File info + actions -->
+					<div class="d-flex flex-wrap gap-2 justify-content-center align-items-center mt-3">
+						<button id="chooseFileBtn" type="button" class="btn btn-glass btn-sm">
+							<i class="bi bi-folder2-open me-1"></i> Choose File
+						</button>
+						<button id="analyzeBtn" type="button" class="btn btn-accent btn-sm" disabled>
+							<i class="bi bi-cpu me-1"></i> Run Detection
+						</button>
 					</div>
 
-					<div id="fileMeta" class="file-meta text-center"></div>
+					<div id="fileMeta" class="file-meta text-center mt-2"></div>
 
-					<div id="loadingState" class="d-none mt-3 text-center" aria-live="polite">
-						<div class="spinner-border spinner-custom text-primary" role="status" aria-hidden="true"></div>
-						<div class="mt-2 text-secondary">Analyzing image...</div>
+					<!-- Loading State -->
+					<div id="loadingState" class="loading-state d-none mt-4" aria-live="polite">
+						<div class="scan-ring">
+							<div class="scan-ring__circle"></div>
+							<i class="bi bi-eye scan-ring__icon"></i>
+						</div>
+						<p class="text-secondary mt-3 mb-0 fw-500">Analyzing image with ensemble models&hellip;</p>
 					</div>
 				</div>
 			</section>
 
-			<section id="resultCard" class="card border-0 shadow-sm d-none" aria-live="polite">
-				<div class="card-body p-4 p-md-5">
-					<h3 class="h4 mb-4">Detection Results</h3>
+			<!-- ─── Error Alert ─── -->
+			<div id="errorAlert" class="alert alert-danger border-0 d-none fade-in" role="alert">
+				<i class="bi bi-exclamation-triangle-fill me-2"></i>
+				<span id="errorMessage"></span>
+			</div>
 
-					<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-						<span class="text-secondary">Final Verdict</span>
-						<span id="finalVerdict" class="verdict">-</span>
+			<!-- ─── Results Section ─── -->
+			<section id="resultCard" class="glass-card d-none fade-in" aria-live="polite">
+				<div class="card-inner">
+
+					<div class="d-flex align-items-center gap-2 mb-4">
+						<i class="bi bi-clipboard2-data-fill text-accent fs-4"></i>
+						<h3 class="h5 fw-700 mb-0">Detection Results</h3>
 					</div>
 
-					<div class="mb-2 d-flex justify-content-between">
-						<span class="text-secondary">Confidence</span>
-						<strong id="confidenceText">0%</strong>
+					<!-- Verdict Hero -->
+					<div class="verdict-hero mb-4">
+						<div class="verdict-ring" id="verdictRing">
+							<svg class="verdict-ring__svg" viewBox="0 0 120 120">
+								<circle class="verdict-ring__track" cx="60" cy="60" r="54" />
+								<circle class="verdict-ring__fill" id="verdictRingFill" cx="60" cy="60" r="54" />
+							</svg>
+							<div class="verdict-ring__label">
+								<span id="confidenceText" class="verdict-ring__value">0%</span>
+								<span class="verdict-ring__caption">confidence</span>
+							</div>
+						</div>
+						<div class="verdict-label-wrap">
+							<span class="verdict-label-title text-secondary">Final Verdict</span>
+							<span id="finalVerdict" class="verdict-badge">—</span>
+						</div>
 					</div>
-					<div class="progress verdict-progress mb-4" role="progressbar" aria-label="Confidence level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+
+					<!-- Confidence Bar -->
+					<div class="mb-2 d-flex justify-content-between align-items-center">
+						<span class="text-secondary small">Ensemble Confidence</span>
+						<strong id="confidenceBarLabel" class="small">0%</strong>
+					</div>
+					<div class="progress verdict-progress mb-4" role="progressbar"
+						 aria-label="Confidence level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
 						<div id="confidenceBar" class="progress-bar" style="width: 0%;">0%</div>
 					</div>
 
+					<!-- Model Breakdown Table -->
 					<div class="table-responsive">
-						<table class="table table-striped align-middle mb-0 results-table">
+						<table class="table results-table align-middle mb-0">
 							<thead>
 								<tr>
-									<th scope="col">Model</th>
+									<th scope="col"><i class="bi bi-diagram-3 me-1"></i>Model</th>
 									<th scope="col" class="text-end">Prediction Confidence</th>
 								</tr>
 							</thead>
 							<tbody>
 								<tr>
-									<td>EfficientNet-B4</td>
-									<td id="efficientnetValue" class="text-end">-</td>
+									<td>
+										<span class="model-badge model-badge--eff">
+											<i class="bi bi-lightning-charge-fill me-1"></i>EfficientNet-B4
+										</span>
+									</td>
+									<td id="efficientnetValue" class="text-end fw-600">—</td>
 								</tr>
 								<tr>
-									<td>Xception</td>
-									<td id="xceptionValue" class="text-end">-</td>
+									<td>
+										<span class="model-badge model-badge--xce">
+											<i class="bi bi-layers-fill me-1"></i>Xception
+										</span>
+									</td>
+									<td id="xceptionValue" class="text-end fw-600">—</td>
 								</tr>
 							</tbody>
 						</table>
 					</div>
+
+					<!-- Reset -->
+					<div class="text-center mt-4">
+						<button id="resetBtn" type="button" class="btn btn-glass btn-sm">
+							<i class="bi bi-arrow-counterclockwise me-1"></i> Analyze Another
+						</button>
+					</div>
 				</div>
 			</section>
+
+			<!-- ─── Footer ─── -->
+			<footer class="text-center mt-5 fade-in fade-in--delay-2">
+				<small class="text-secondary">
+					Built with <i class="bi bi-heart-fill text-danger"></i> using PyTorch &middot; Flask &middot; Bootstrap 5
+				</small>
+			</footer>
 		</div>
 	</main>
 

@@ -1,4 +1,3 @@
-# app/app.py
 
 from flask import Flask, render_template, request, jsonify
 import io
@@ -25,8 +24,8 @@ IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 
 
 def load_models():
     print("Loading models...")
-    efficientnet = create_model("efficientnet_b4", num_classes=2, pretrained=False)
-    xception = create_model("xception", num_classes=2, pretrained=False)
+    efficientnet = create_model("efficientnet_b4", num_classes=6, pretrained=False)
+    xception = create_model("xception", num_classes=6, pretrained=False)
 
     efficientnet_path = MODEL_DIR / "efficientnet_b4_best.pth"
     xception_path = MODEL_DIR / "xception_best.pth"
