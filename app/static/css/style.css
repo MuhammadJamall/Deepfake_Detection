@@ -1,0 +1,114 @@
+:root {
+	--page-bg-start: #f8fbff;
+	--page-bg-mid: #eaf1ff;
+	--page-bg-end: #f6f7fb;
+	--panel-bg: #ffffff;
+	--muted-text: #6c757d;
+	--accent: #2a64ff;
+	--accent-soft: #7da2ff;
+	--success: #198754;
+	--danger: #dc3545;
+	--line: #d4dceb;
+}
+
+body {
+	min-height: 100vh;
+	background: linear-gradient(135deg, var(--page-bg-start) 0%, var(--page-bg-mid) 45%, var(--page-bg-end) 100%);
+}
+
+.app-shell {
+	max-width: 880px;
+}
+
+.upload-zone {
+	border: 2px dashed var(--accent-soft);
+	border-radius: 1rem;
+	background: var(--panel-bg);
+	padding: 2.5rem 1.5rem;
+	text-align: center;
+	transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+	cursor: pointer;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 0.25rem rgba(42, 100, 255, 0.15);
+	transform: translateY(-1px);
+}
+
+.file-meta {
+	font-size: 0.95rem;
+	color: var(--muted-text);
+	min-height: 1.5rem;
+}
+
+.verdict {
+	font-size: 2rem;
+	font-weight: 800;
+	letter-spacing: 0.03em;
+}
+
+.verdict-real {
+	color: var(--success);
+}
+
+.verdict-fake {
+	color: var(--danger);
+}
+
+.verdict-progress {
+	background-color: #edf1f9;
+}
+
+#confidenceBar {
+	font-weight: 700;
+	transition: width 0.35s ease;
+}
+
+#confidenceBar.confidence-real {
+	background-color: var(--success);
+}
+
+#confidenceBar.confidence-fake {
+	background-color: var(--danger);
+}
+
+.results-table {
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+}
+
+.results-table thead th {
+	background: #eef3ff;
+	font-weight: 700;
+	border-bottom: 1px solid var(--line);
+}
+
+.results-table th,
+.results-table td {
+	border-right: 1px solid var(--line);
+	border-bottom: 1px solid var(--line);
+}
+
+.results-table th:last-child,
+.results-table td:last-child {
+	border-right: 0;
+}
+
+.results-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.spinner-custom {
+	animation: app-spin 0.85s linear infinite !important;
+}
+
+@keyframes app-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
