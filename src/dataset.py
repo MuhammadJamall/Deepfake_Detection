@@ -5,7 +5,7 @@ Binary Classification: REAL (Original) vs FAKE (All Deepfakes)
 
 import os
 from pathlib import Path
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 import torch
@@ -27,8 +27,6 @@ CLASS_MAPPING = {
 class DeepfakeDataset(Dataset):
     """
     Custom PyTorch Dataset for Deepfake detection (Binary Classification)
-    
-    Loads images from organized class folders and provides binary labels.
     """
     
     def __init__(self, root_dir, indices=None, transform=None):
@@ -49,7 +47,6 @@ class DeepfakeDataset(Dataset):
         for class_name in sorted(CLASS_MAPPING.keys()):
             class_path = self.root_dir / class_name
             if class_path.exists():
-                # Find all images (.png and .jpg)
                 image_files = sorted(list(class_path.glob('*.png')) + list(class_path.glob('*.jpg')))
                 binary_label = CLASS_MAPPING[class_name]
                 
@@ -57,66 +54,28 @@ class DeepfakeDataset(Dataset):
                     self.images.append(img_file)
                     self.labels.append(binary_label)
         
-        # Apply indices if provided (for train/val/test split)
+        # Apply indices if provided
         if indices is not None:
             self.images = [self.images[i] for i in indices]
             self.labels = [self.labels[i] for i in indices]
     
     def __len__(self):
-        """Return total number of images"""
         return len(self.images)
     
     def __getitem__(self, idx):
-        """
-        Return image and label
-        
-        Args:
-            idx (int): Index of the item
-            
-        Returns:
-            tuple: (image tensor, binary label)
-        """
         img_path = self.images[idx]
         label = self.labels[idx]
         
-        # Load and convert image to RGB
         image = Image.open(img_path).convert('RGB')
         
-        # Apply transformations if provided
         if self.transform:
             image = self.transform(image)
         
         return image, label
-    
-    def get_stats(self):
-        """Print dataset statistics"""
-        class_counts = defaultdict(int)
-        for label in self.labels:
-            class_name = 'REAL' if label == 0 else 'FAKE'
-            class_counts[class_name] += 1
-        
-        print("\n" + "="*50)
-        print("DATASET STATISTICS")
-        print("="*50)
-        print(f"Total images: {len(self)}")
-        print("\nClass distribution (Binary):")
-        for class_name in sorted(class_counts.keys()):
-            count = class_counts[class_name]
-            percentage = (count / len(self)) * 100
-            print(f"  {class_name}: {count} ({percentage:.1f}%)")
-        print("="*50 + "\n")
 
 
 def get_transforms(img_size=224):
-    """
-    Create training and validation transforms
-    
-    Args:
-        img_size (int): Image size for resizing
-        
-    Returns:
-        tuple: (train_transform, val_transform)
-    """
+    """Create training and validation transforms"""
     
     train_transform = transforms.Compose([
         transforms.Resize((img_size, img_size)),
@@ -145,47 +104,33 @@ def get_transforms(img_size=224):
 
 def get_dataloaders(dataset_dir, batch_size=32, train_split=0.8, val_split=0.1, num_workers=2):
     """
-    Create train, validation, and test dataloaders with proper splitting
-    
-    IMPORTANT: Data is split ONCE at the beginning to avoid data leakage.
-    Each image appears in only ONE set (train/val/test).
-    
-    Args:
-        dataset_dir (str): Path to dataset directory
-        batch_size (int): Batch size for dataloaders
-        train_split (float): Proportion for training (default: 0.8)
-        val_split (float): Proportion for validation (default: 0.1)
-        num_workers (int): Number of workers for data loading
-        
-    Returns:
-        tuple: (train_loader, val_loader, test_loader, binary_class_to_idx)
+    Create train, validation, and test dataloaders with BINARY classification
     """
     
     train_transform, val_transform = get_transforms()
     
-    # Load full dataset ONCE (without transforms or indices)
+    # Load full dataset
     full_dataset = DeepfakeDataset(dataset_dir, transform=None)
     total_size = len(full_dataset)
     
     print(f"\n✓ Dataset loaded from: {dataset_dir}")
     print(f"✓ Total images: {total_size}")
-    print(f"✓ Number of classes (Binary): 2 (REAL, FAKE)")
+    print(f"✓ Number of classes (Binary): 2 (REAL=0, FAKE=1)")
     
-    # Calculate split sizes (80/10/10)
+    # Calculate split sizes
     train_size = int(total_size * train_split)
     val_size = int(total_size * val_split)
     test_size = total_size - train_size - val_size
     
     # Create indices and split ONCE
-    all_indices = list(range(total_size))
-    torch.manual_seed(42)  # For reproducibility
+    torch.manual_seed(42)
     shuffled_indices = torch.randperm(total_size).tolist()
     
     train_indices = shuffled_indices[:train_size]
     val_indices = shuffled_indices[train_size:train_size + val_size]
     test_indices = shuffled_indices[train_size + val_size:]
     
-    # Create 3 datasets using the same full_dataset but with different indices
+    # Create 3 datasets using same images but different indices
     train_dataset = DeepfakeDataset(dataset_dir, indices=train_indices, transform=train_transform)
     val_dataset = DeepfakeDataset(dataset_dir, indices=val_indices, transform=val_transform)
     test_dataset = DeepfakeDataset(dataset_dir, indices=test_indices, transform=val_transform)
@@ -214,7 +159,7 @@ def get_dataloaders(dataset_dir, batch_size=32, train_split=0.8, val_split=0.1, 
     )
     
     print("\n" + "="*50)
-    print("DATALOADER SPLIT (No Data Leakage)")
+    print("DATALOADER SPLIT (Binary Classification)")
     print("="*50)
     print(f"Training set: {train_size} images ({train_split*100:.0f}%)")
     print(f"Validation set: {val_size} images ({val_split*100:.0f}%)")
@@ -222,26 +167,6 @@ def get_dataloaders(dataset_dir, batch_size=32, train_split=0.8, val_split=0.1, 
     print(f"Batch size: {batch_size}")
     print("="*50 + "\n")
     
-    # Binary class mapping
     binary_class_to_idx = {'REAL': 0, 'FAKE': 1}
     
     return train_loader, val_loader, test_loader, binary_class_to_idx
-
-
-if __name__ == "__main__":
-    # Test code
-    dataset_path = "./data"
-    
-    if os.path.exists(dataset_path):
-        train_loader, val_loader, test_loader, class_to_idx = get_dataloaders(
-            dataset_path,
-            batch_size=32
-        )
-        
-        # Verify a batch
-        images, labels = next(iter(train_loader))
-        print(f"✓ Batch shape: {images.shape}")
-        print(f"✓ Labels: {labels}")
-        print(f"✓ Unique labels in batch: {torch.unique(labels).tolist()}")
-    else:
-        print(f"⚠ Dataset not found at {dataset_path}")
