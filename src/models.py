@@ -29,18 +29,24 @@ class EfficientNetClassifier(nn.Module):
         return self.backbone(x)
     
     def freeze_backbone(self):
-        """Freeze backbone parameters"""
-        for param in self.backbone.features.parameters():
-            param.requires_grad = False
+        """Freeze backbone parameters (everything except classifier)"""
+        # For timm models, freeze all except classifier
+        for name, param in self.backbone.named_parameters():
+            if 'classifier' not in name:
+                param.requires_grad = False
     
     def unfreeze_backbone(self):
-        """Unfreeze backbone parameters"""
-        for param in self.backbone.features.parameters():
+        """Unfreeze all parameters"""
+        for param in self.backbone.parameters():
             param.requires_grad = True
     
     def get_backbone_params(self):
-        """Get backbone parameters"""
-        return self.backbone.features.parameters()
+        """Get backbone parameters (excluding classifier)"""
+        params = []
+        for name, param in self.backbone.named_parameters():
+            if 'classifier' not in name:
+                params.append(param)
+        return params
     
     def get_head_params(self):
         """Get classifier head parameters"""
@@ -110,29 +116,3 @@ def create_model(model_name, num_classes=2, pretrained=True):
         return XceptionClassifier(num_classes=num_classes, pretrained=pretrained)
     else:
         raise ValueError(f"Unknown model: {model_name}")
-
-
-if __name__ == "__main__":
-    # Test model creation
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    print("Testing model creation for binary classification...")
-    
-    efficientnet = create_model('efficientnet_b4', num_classes=2, pretrained=True)
-    efficientnet = efficientnet.to(device)
-    print(f"✓ EfficientNet-B4 created: {efficientnet}")
-    
-    xception = create_model('xception', num_classes=2, pretrained=True)
-    xception = xception.to(device)
-    print(f"✓ Xception created: {xception}")
-    
-    # Test forward pass
-    dummy_input = torch.randn(2, 3, 224, 224).to(device)
-    
-    with torch.no_grad():
-        eff_out = efficientnet(dummy_input)
-        xep_out = xception(dummy_input)
-    
-    print(f"\n✓ EfficientNet output shape: {eff_out.shape}")
-    print(f"✓ Xception output shape: {xep_out.shape}")
-    print("✓ Both models ready for binary classification!")
