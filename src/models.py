@@ -13,7 +13,6 @@ class EfficientNetClassifier(nn.Module):
     def __init__(self, num_classes=2, pretrained=True):
         super().__init__()
         self.backbone = timm_create_model('efficientnet_b4', pretrained=pretrained)
-        
         # Get the number of features from the backbone
         num_features = self.backbone.classifier.in_features
         
